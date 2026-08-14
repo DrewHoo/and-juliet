@@ -23,8 +23,12 @@ export const SONGS = [
   { id: 'its-my-life', number: "It's My Life", title: "It's My Life", artist: 'Bon Jovi', date: '2000-05-23', album: 'Crush', hot100: 33, ukPeak: 3, streamsM: 1318 },
   { id: 'love-me-like-you-do', number: 'Love Me Like You Do', title: 'Love Me Like You Do', artist: 'Ellie Goulding', date: '2015-01-07', album: 'Fifty Shades of Grey (OST)', hot100: 3, ukPeak: 1, streamsM: 1868 },
   { id: 'since-u-been-gone', number: 'Since U Been Gone', title: 'Since U Been Gone', artist: 'Kelly Clarkson', date: '2004-11-16', album: 'Breakaway', hot100: 2, ukPeak: 5, streamsM: 1149 },
-  { id: 'whataya-want-from-me', number: 'Whataya Want from Me', title: 'Whataya Want from Me', artist: 'Adam Lambert', date: '2009-11-10', album: 'For Your Entertainment', hot100: 10, ukPeak: 16, streamsM: 250 },
-  { id: 'one-more-try', number: 'One More Try', title: 'One More Try', artist: 'Written for the show', date: '2019-11-22', album: '& Juliet (Original London Cast Recording)', hot100: null, ukPeak: null, streamsM: null, original: true },
+  // Filed under P!nk: she co-wrote it and recorded it first; Adam Lambert's
+  // single was the original release (date and streams shown are his).
+  { id: 'whataya-want-from-me', number: 'Whataya Want from Me', title: 'Whataya Want from Me', artist: 'P!nk', date: '2009-11-10', album: 'For Your Entertainment', hot100: 10, ukPeak: 16, streamsM: 250 },
+  // The show's one original; Jessie J released the standalone single, so it
+  // hangs on her lane in the chart.
+  { id: 'one-more-try', number: 'One More Try', title: 'One More Try', artist: 'Written for the show', lane: 'Jessie J', date: '2019-11-22', album: '& Juliet (Original London Cast Recording)', hot100: null, ukPeak: null, streamsM: null, original: true },
   { id: 'problem', number: "Problem / Can't Feel My Face", title: 'Problem', artist: 'Ariana Grande', date: '2014-04-28', album: 'My Everything', hot100: 2, ukPeak: 1, streamsM: 1168 },
   { id: 'cant-feel-my-face', number: "Problem / Can't Feel My Face", title: "Can't Feel My Face", artist: 'The Weeknd', date: '2015-06-08', album: 'Beauty Behind the Madness', hot100: 1, ukPeak: 3, streamsM: 2237 },
   { id: 'thats-the-way-it-is', number: "That's the Way It Is", title: "That's the Way It Is", artist: 'Céline Dion', date: '1999-11-01', album: 'All the Way… A Decade of Song', hot100: 6, ukPeak: 12, streamsM: 240 },

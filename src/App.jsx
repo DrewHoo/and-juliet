@@ -82,11 +82,18 @@ export default function App() {
       <section>
         <h2>Who brought the hits?</h2>
         <p className="sub">
-          One row per artist, sorted by how many songs they contribute —
-          Backstreet Boys on top with six. Each bubble sits at the
-          original&rsquo;s release date and is sized by its Spotify streams
-          today; the violet one is &ldquo;One More Try,&rdquo; the only song
-          written for the show. Tap any bubble for details.
+          <span className="desktop-only">
+            One row per artist, sorted by how many songs they contribute —
+            Backstreet Boys on top with six.{' '}
+          </span>
+          <span className="mobile-only">
+            The timeline runs top to bottom, newest first (artist rows live on
+            wider screens).{' '}
+          </span>
+          Each bubble sits at the original&rsquo;s release date and is sized
+          by its Spotify streams today; the violet one is &ldquo;One More
+          Try,&rdquo; the only song written for the show. Tap any bubble for
+          details.
         </p>
         <div className="card">
           <Timeline songs={SONGS} selected={selected} onSelect={select} />
@@ -119,7 +126,11 @@ export default function App() {
           from kworb.net as of August 2026 — and they measure popularity now,
           not then: older songs have had decades to pile up plays, newer ones
           grew up on streaming, so bubble size is a rough proxy, not a
-          scoreboard.
+          scoreboard. Two judgment calls: &ldquo;Whataya Want from Me&rdquo;
+          is filed under P!nk, who co-wrote it and recorded it first — Adam
+          Lambert&rsquo;s single was the original release, and the date and
+          streams shown are his. And &ldquo;One More Try&rdquo; hangs on
+          Jessie J&rsquo;s row, since she released its standalone single.
         </p>
       </section>
     </main>

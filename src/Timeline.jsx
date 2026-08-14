@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
-const EVERYONE_ELSE = '…& everyone else'
 const PREMIERE = Date.UTC(2019, 10, 20) // West End opening night, 20 Nov 2019
 
 function ts(iso) {
@@ -21,25 +20,59 @@ export function fmtStreams(m) {
   return `${Math.round(m)}M`
 }
 
-// Group songs into swimlanes: artists with 2+ songs get their own lane
-// (sorted most-influential first), everyone else shares the bottom lane.
+// One swimlane per artist, most influential first (song count, then total
+// streams). A song can point its lane elsewhere via `lane` (e.g. "One More
+// Try" hangs on Jessie J, who released its single).
 export function buildLanes(songs) {
   const byArtist = new Map()
   for (const s of songs) {
-    if (!byArtist.has(s.artist)) byArtist.set(s.artist, [])
-    byArtist.get(s.artist).push(s)
+    const key = s.lane || s.artist
+    if (!byArtist.has(key)) byArtist.set(key, [])
+    byArtist.get(key).push(s)
   }
-  const majors = [...byArtist.entries()]
-    .filter(([, list]) => list.length >= 2)
-    .sort((a, b) => {
-      if (b[1].length !== a[1].length) return b[1].length - a[1].length
-      const streams = (list) => list.reduce((t, s) => t + (s.streamsM || 0), 0)
-      return streams(b[1]) - streams(a[1])
-    })
-  const rest = songs.filter((s) => byArtist.get(s.artist).length < 2)
-  const lanes = majors.map(([artist, list]) => ({ artist, songs: list }))
-  if (rest.length) lanes.push({ artist: EVERYONE_ELSE, songs: rest })
-  return lanes
+  const total = (list) => list.reduce((t, s) => t + (s.streamsM || 0), 0)
+  return [...byArtist.entries()]
+    .sort((a, b) => b[1].length - a[1].length || total(b[1]) - total(a[1]))
+    .map(([artist, list]) => ({ artist, songs: list }))
+}
+
+function boxesOverlap(a, b) {
+  return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
+}
+
+function boxHitsCircle(box, c) {
+  const nx = Math.max(box.x, Math.min(c.cx, box.x + box.w))
+  const ny = Math.max(box.y, Math.min(c.cy, box.y + box.h))
+  return Math.hypot(c.cx - nx, c.cy - ny) < c.r + 2
+}
+
+const textW = (t, size = 11) => t.length * size * 0.51 + 8
+
+// Greedy label placement: try above/below/right/left of the bubble, skip the
+// label entirely if every spot collides with another label or a bubble.
+function placeLabels(candidates, placed, width, size = 11) {
+  const out = []
+  for (const { d, text } of candidates) {
+    const bw = textW(text, size)
+    const spots = [
+      { pos: 'above', x: d.cx - bw / 2, y: d.cy - d.r - 17 },
+      { pos: 'below', x: d.cx - bw / 2, y: d.cy + d.r + 4 },
+      { pos: 'right', x: d.cx + d.r + 6, y: d.cy - 6.5 },
+      { pos: 'left', x: d.cx - d.r - 6 - bw, y: d.cy - 6.5 },
+    ]
+    for (const c of spots) {
+      const box = { x: c.x, y: c.y, w: bw, h: 13 }
+      if (box.x < 2 || box.x + box.w > width - 2) continue
+      const collides =
+        out.some((o) => boxesOverlap(box, o.box)) ||
+        placed.some((p) => p !== d && boxHitsCircle(box, p))
+      if (!collides) {
+        out.push({ d, text, pos: c.pos, box })
+        break
+      }
+    }
+  }
+  return out
 }
 
 export default function Timeline({ songs, selected, onSelect }) {
@@ -59,30 +92,55 @@ export default function Timeline({ songs, selected, onSelect }) {
     return () => ro.disconnect()
   }, [])
 
-  const narrow = width < 640
-  const margin = {
-    top: 8,
-    right: narrow ? 10 : 24,
-    bottom: 26,
-    left: narrow ? 10 : 168,
-  }
+  const vertical = width < 560
 
   const layout = useMemo(() => {
     const lanes = buildLanes(songs)
     const dates = songs.map((s) => ts(s.date))
-    const x0 = Math.min(...dates)
-    const domainStart = Date.UTC(new Date(x0).getUTCFullYear() - 1, 0, 1)
-    const domainEnd = Date.UTC(2020, 3, 1) // room for the premiere marker
+    const domainStart = Date.UTC(new Date(Math.min(...dates)).getUTCFullYear() - 1, 0, 1)
+    const domainEnd = Date.UTC(2020, 3, 1)
+    const maxStreams = Math.max(...songs.map((s) => s.streamsM || 0))
+
+    if (vertical) {
+      // Phone layout: time runs down the page, newest first, bubbles swarm
+      // around a spine; artist ranking lives in the lane view and the table.
+      const margin = { top: 34, bottom: 16, left: 44, right: 8 }
+      const startYear = new Date(domainStart).getUTCFullYear()
+      const years = 2020.25 - startYear
+      const pxPerYear = 34
+      const height = margin.top + years * pxPerYear + margin.bottom
+      const y = (t) =>
+        margin.top +
+        ((domainEnd - t) / (domainEnd - domainStart)) * (height - margin.top - margin.bottom)
+      const maxR = 17
+      const r = (m) => (m == null ? 5.5 : 4 + Math.sqrt(m / maxStreams) * (maxR - 4))
+      const spineX = margin.left + (width - margin.left - margin.right) * 0.38
+      const placed = []
+      for (const s of [...songs].sort((a, b) => ts(a.date) - ts(b.date))) {
+        const d = { song: s, lane: s.lane || s.artist, cy: y(ts(s.date)), r: r(s.streamsM), cx: spineX }
+        const step = 10
+        for (let i = 0; i < 24; i++) {
+          const o = i === 0 ? 0 : (i % 2 ? 1 : -1) * Math.ceil(i / 2) * step
+          d.cx = Math.max(margin.left + d.r + 2, Math.min(spineX + o, width - margin.right - d.r))
+          if (!placed.some((p) => Math.hypot(p.cx - d.cx, p.cy - d.cy) < p.r + d.r + 3)) break
+        }
+        placed.push(d)
+      }
+      const yearTicks = []
+      for (let yr = startYear; yr <= 2020; yr++) {
+        if (yr % 5 === 0) yearTicks.push(yr)
+      }
+      return { vertical: true, placed, lanes, height, y, yearTicks, margin }
+    }
+
+    // Desktop layout: one horizontal lane per artist, timeline left to right.
+    const margin = { top: 8, right: 24, bottom: 26, left: 168 }
     const innerW = Math.max(width - margin.left - margin.right, 200)
     const x = (t) => margin.left + ((t - domainStart) / (domainEnd - domainStart)) * innerW
-
-    const maxStreams = Math.max(...songs.map((s) => s.streamsM || 0))
-    const maxR = narrow ? 17 : 24
+    const maxR = 24
     const r = (m) => (m == null ? 5.5 : 4 + Math.sqrt(m / maxStreams) * (maxR - 4))
 
-    // Per-lane collision relief: nudge overlapping bubbles up/down a step.
-    const laneHeader = narrow ? 20 : 0
-    let y = margin.top
+    let yCursor = margin.top
     const placed = []
     const laneBands = []
     for (const lane of lanes) {
@@ -91,90 +149,57 @@ export default function Timeline({ songs, selected, onSelect }) {
         .sort((a, b) => a.cx - b.cx)
       const step = 9
       for (let i = 0; i < rows.length; i++) {
-        const offsets = [0, -1, 1, -2, 2, -3, 3]
-        for (const o of offsets) {
+        for (const o of [0, -1, 1, -2, 2, -3, 3]) {
           rows[i].dy = o * step
           const collides = rows
             .slice(0, i)
-            .some(
-              (p) =>
-                Math.hypot(p.cx - rows[i].cx, p.dy - rows[i].dy) <
-                p.r + rows[i].r + 3,
-            )
+            .some((p) => Math.hypot(p.cx - rows[i].cx, p.dy - rows[i].dy) < p.r + rows[i].r + 3)
           if (!collides) break
         }
       }
-      const spread = Math.max(...rows.map((d) => Math.abs(d.dy) + d.r), 14)
-      const laneH = laneHeader + spread * 2 + 14
-      const cy = y + laneHeader + (laneH - laneHeader) / 2
+      const spread = Math.max(...rows.map((d) => Math.abs(d.dy) + d.r), 12)
+      const laneH = spread * 2 + 12
+      const cy = yCursor + laneH / 2
       for (const d of rows) placed.push({ ...d, cy: cy + d.dy, lane: lane.artist })
-      laneBands.push({ lane, top: y, height: laneH, cy })
-      y += laneH
+      laneBands.push({ lane, top: yCursor, height: laneH, cy })
+      yCursor += laneH
     }
-
-    const height = y + margin.bottom
-    const years = []
+    const height = yCursor + margin.bottom
+    const yearTicks = []
     for (let yr = new Date(domainStart).getUTCFullYear(); yr <= 2020; yr++) {
-      if (yr % 5 === 0) years.push(yr)
+      if (yr % 5 === 0) yearTicks.push(yr)
     }
-    return { placed, laneBands, height, x, years, domainStart, domainEnd }
-  }, [songs, width, narrow, margin.left, margin.right, margin.top])
+    return { vertical: false, placed, laneBands, lanes, height, x, yearTicks, margin }
+  }, [songs, width, vertical])
 
-  const { placed, laneBands, height, x, years } = layout
+  const { placed, height, margin } = layout
 
-  // Direct-label only the headliners; everything else lives in tooltip + table.
-  // Labels that would collide flip below the bubble, and drop entirely if
-  // still overlapping an already-placed label.
   const labels = useMemo(() => {
-    // Top song per lane keeps labels spread across the chart instead of
-    // piling up in the streaming-era cluster; the show original always gets one.
-    const byLane = new Map()
+    if (layout.vertical) {
+      // Artist name on each artist's biggest bubble, most-streamed first so
+      // headliners win the space.
+      const topOfLane = new Map()
+      for (const d of placed) {
+        const cur = topOfLane.get(d.lane)
+        if (!cur || (d.song.streamsM || 0) > (cur.song.streamsM || 0)) topOfLane.set(d.lane, d)
+      }
+      const candidates = [...topOfLane.values()]
+        .sort((a, b) => (b.song.streamsM || 0) - (a.song.streamsM || 0))
+        .map((d) => ({ d, text: d.lane }))
+      return placeLabels(candidates, placed, width, 10.5)
+    }
+    // Lane view: song titles — the lane label already names the artist.
+    const topOfLane = new Map()
     for (const d of placed) {
-      const cur = byLane.get(d.lane)
-      if (!cur || (d.song.streamsM || 0) > (cur.streamsM || 0)) {
-        byLane.set(d.lane, d.song)
-      }
+      const cur = topOfLane.get(d.lane)
+      if (!cur || (d.song.streamsM || 0) > (cur.song.streamsM || 0)) topOfLane.set(d.lane, d)
     }
-    const top = [
-      ...[...byLane.values()].sort((a, b) => (b.streamsM || 0) - (a.streamsM || 0)),
-      ...songs.filter((s) => s.original),
-    ].slice(0, narrow ? 4 : 8)
-    const out = []
-    const w = (t) => t.length * 5.6 + 8
-    const hitsCircle = (box, c) => {
-      const nx = Math.max(box.x, Math.min(c.cx, box.x + box.w))
-      const ny = Math.max(box.y, Math.min(c.cy, box.y + box.h))
-      return Math.hypot(c.cx - nx, c.cy - ny) < c.r + 2
-    }
-    for (const s of top) {
-      const d = placed.find((p) => p.song.id === s.id)
-      if (!d) continue
-      const bw = w(s.title)
-      const candidates = [
-        { pos: 'above', x: d.cx - bw / 2, y: d.cy - d.r - 17 },
-        { pos: 'below', x: d.cx - bw / 2, y: d.cy + d.r + 4 },
-        { pos: 'right', x: d.cx + d.r + 6, y: d.cy - 6.5 },
-        { pos: 'left', x: d.cx - d.r - 6 - bw, y: d.cy - 6.5 },
-      ]
-      for (const c of candidates) {
-        const box = { x: c.x, y: c.y, w: bw, h: 13 }
-        if (box.x < 2 || box.x + box.w > width - 2) continue
-        const collides =
-          out.some(
-            (o) =>
-              box.x < o.box.x + o.box.w &&
-              o.box.x < box.x + box.w &&
-              box.y < o.box.y + o.box.h &&
-              o.box.y < box.y + box.h,
-          ) || placed.some((p) => p !== d && hitsCircle(box, p))
-        if (!collides) {
-          out.push({ d, pos: c.pos, box })
-          break
-        }
-      }
-    }
-    return out
-  }, [songs, narrow, placed, width])
+    const candidates = [
+      ...[...topOfLane.values()].sort((a, b) => (b.song.streamsM || 0) - (a.song.streamsM || 0)).slice(0, 10),
+      ...placed.filter((d) => d.song.original),
+    ].map((d) => ({ d, text: d.song.title }))
+    return placeLabels(candidates, placed, width)
+  }, [layout.vertical, placed, width])
 
   const active = hovered ?? placed.find((d) => d.song.id === selected) ?? null
 
@@ -200,51 +225,62 @@ export default function Timeline({ songs, selected, onSelect }) {
           <i className="dot pink lg" /> more streams
         </span>
       </div>
-      <svg width={width} height={height} role="img" aria-label="Timeline of the original recordings behind & Juliet, one row per artist, bubbles sized by Spotify streams. Full data in the table below.">
-        {/* year gridlines */}
-        {years.map((yr) => {
-          const gx = x(Date.UTC(yr, 0, 1))
-          return (
-            <g key={yr}>
-              <line x1={gx} x2={gx} y1={margin.top} y2={height - margin.bottom + 4} stroke="var(--grid)" strokeWidth="1" />
-              <text x={gx} y={height - 8} textAnchor="middle" fontSize="11" fill="var(--text-muted)">
-                {yr}
-              </text>
-            </g>
-          )
-        })}
-
-        {/* premiere marker */}
-        <line x1={x(PREMIERE)} x2={x(PREMIERE)} y1={margin.top + 12} y2={height - margin.bottom + 4} stroke="var(--violet)" strokeWidth="1" />
-        <text x={x(PREMIERE) - 6} y={margin.top + 22} textAnchor="end" fontSize="11" fill="var(--violet)">
-          &amp; Juliet opens{narrow ? '' : ' · Nov 2019'}
-        </text>
-
-        {/* lane separators + labels */}
-        {laneBands.map(({ lane, top, height: lh, cy }, i) => (
-          <g key={lane.artist}>
-            {i > 0 && (
-              <line x1={narrow ? 0 : 8} x2={width - 4} y1={top} y2={top} stroke="var(--baseline)" strokeWidth="1" />
-            )}
-            {narrow ? (
-              <text x={2} y={top + 14} fontSize="11.5" fontWeight="600" fill="var(--text-secondary)">
-                {lane.artist}
-                <tspan fill="var(--text-muted)" fontWeight="400">
-                  {'  ·  '}{lane.songs.length} {lane.songs.length === 1 ? 'song' : 'songs'}
-                </tspan>
-              </text>
-            ) : (
-              <>
-                <text x={margin.left - 14} y={cy - 2} textAnchor="end" fontSize="12.5" fontWeight="600" fill="var(--text-secondary)">
+      <svg
+        width={width}
+        height={height}
+        role="img"
+        aria-label="Timeline of the original recordings behind & Juliet, grouped by artist, bubbles sized by Spotify streams. Full data in the table below."
+      >
+        {layout.vertical ? (
+          <>
+            {layout.yearTicks.map((yr) => {
+              const gy = layout.y(Date.UTC(yr, 0, 1))
+              return (
+                <g key={yr}>
+                  <line x1={margin.left - 4} x2={width - 2} y1={gy} y2={gy} stroke="var(--grid)" strokeWidth="1" />
+                  <text x={margin.left - 8} y={gy + 4} textAnchor="end" fontSize="11" fill="var(--text-muted)">
+                    {yr}
+                  </text>
+                </g>
+              )
+            })}
+            <line x1={margin.left - 4} x2={width - 2} y1={layout.y(PREMIERE)} y2={layout.y(PREMIERE)} stroke="var(--violet)" strokeWidth="1" />
+            <text x={width - 4} y={layout.y(PREMIERE) - 6} textAnchor="end" fontSize="11" fill="var(--violet)">
+              &amp; Juliet opens · Nov 2019
+            </text>
+          </>
+        ) : (
+          <>
+            {layout.yearTicks.map((yr) => {
+              const gx = layout.x(Date.UTC(yr, 0, 1))
+              return (
+                <g key={yr}>
+                  <line x1={gx} x2={gx} y1={margin.top} y2={height - margin.bottom + 4} stroke="var(--grid)" strokeWidth="1" />
+                  <text x={gx} y={height - 8} textAnchor="middle" fontSize="11" fill="var(--text-muted)">
+                    {yr}
+                  </text>
+                </g>
+              )
+            })}
+            <line x1={layout.x(PREMIERE)} x2={layout.x(PREMIERE)} y1={margin.top + 12} y2={height - margin.bottom + 4} stroke="var(--violet)" strokeWidth="1" />
+            <text x={layout.x(PREMIERE) - 6} y={margin.top + 22} textAnchor="end" fontSize="11" fill="var(--violet)">
+              &amp; Juliet opens · Nov 2019
+            </text>
+            {layout.laneBands.map(({ lane, top, cy }, i) => (
+              <g key={lane.artist}>
+                {i > 0 && <line x1={8} x2={width - 4} y1={top} y2={top} stroke="var(--baseline)" strokeWidth="1" />}
+                <text x={margin.left - 14} y={lane.songs.length > 1 ? cy - 2 : cy + 4} textAnchor="end" fontSize="12.5" fontWeight="600" fill="var(--text-secondary)">
                   {lane.artist}
                 </text>
-                <text x={margin.left - 14} y={cy + 13} textAnchor="end" fontSize="11" fill="var(--text-muted)">
-                  {lane.songs.length} {lane.songs.length === 1 ? 'song' : 'songs'} · {fmtStreams(lane.songs.reduce((t, s) => t + (s.streamsM || 0), 0))} streams
-                </text>
-              </>
-            )}
-          </g>
-        ))}
+                {lane.songs.length > 1 && (
+                  <text x={margin.left - 14} y={cy + 13} textAnchor="end" fontSize="11" fill="var(--text-muted)">
+                    {lane.songs.length} songs · {fmtStreams(lane.songs.reduce((t, s) => t + (s.streamsM || 0), 0))} streams
+                  </text>
+                )}
+              </g>
+            ))}
+          </>
+        )}
 
         {/* bubbles — bigger ones first so small stay reachable */}
         {[...placed]
@@ -271,7 +307,6 @@ export default function Timeline({ songs, selected, onSelect }) {
                   }
                 }}
               >
-                {/* generous invisible hit target */}
                 <circle cx={d.cx} cy={d.cy} r={Math.max(d.r + 6, 14)} fill="transparent" />
                 {isSelected && (
                   <circle cx={d.cx} cy={d.cy} r={d.r + 4} fill="none" stroke="var(--violet)" strokeWidth="2" />
@@ -289,18 +324,17 @@ export default function Timeline({ songs, selected, onSelect }) {
             )
           })}
 
-        {/* selective direct labels on the headliners */}
-        {labels.map(({ d, pos, box }) => (
+        {labels.map(({ d, text, pos, box }) => (
           <text
             key={`lbl-${d.song.id}`}
             x={pos === 'above' || pos === 'below' ? d.cx : pos === 'right' ? box.x : box.x + box.w}
             y={box.y + 10}
             textAnchor={pos === 'right' ? 'start' : pos === 'left' ? 'end' : 'middle'}
-            fontSize="11"
+            fontSize={layout.vertical ? 10.5 : 11}
             fill="var(--text-secondary)"
             style={{ pointerEvents: 'none' }}
           >
-            {d.song.title}
+            {text}
           </text>
         ))}
       </svg>

@@ -39,7 +39,7 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" v
   <text x="60" y="270" font-family="Georgia, serif" font-style="italic" font-weight="700" font-size="230" fill="#f23a95">&amp;</text>
   <text x="62" y="360" font-family="Helvetica, Arial, sans-serif" font-style="italic" font-weight="900" font-size="64" fill="#ffffff">WHO WROTE</text>
   <text x="62" y="435" font-family="Helvetica, Arial, sans-serif" font-style="italic" font-weight="900" font-size="64" fill="#f23a95">&amp; JULIET<tspan fill="#ffffff">?</tspan></text>
-  <text x="64" y="490" font-family="Helvetica, Arial, sans-serif" font-size="26" fill="#cfc3e0">29 pop hits, 17 artists, one Max Martin.</text>
+  <text x="64" y="490" font-family="Helvetica, Arial, sans-serif" font-size="26" fill="#cfc3e0">29 pop hits, 16 artists, one Max Martin.</text>
 
   ${laneLines}
   ${bubbles}

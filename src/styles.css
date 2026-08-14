@@ -271,6 +271,13 @@ td .artist { color: var(--text-secondary); }
 
 /* ---------- responsive ---------- */
 
+/* Matches the chart's vertical-layout breakpoint (container < 560px). */
+.mobile-only { display: none; }
+@media (max-width: 616px) {
+  .mobile-only { display: inline; }
+  .desktop-only { display: none; }
+}
+
 @media (max-width: 720px) {
   main { padding: 32px 14px 60px; }
   .hero .amp { font-size: 84px; }
