@@ -10,6 +10,8 @@ and sized by Spotify streams today. Live at
 - Data: Broadway cast recording track list; Billboard/Wikipedia for release
   dates and chart peaks; kworb.net (Aug 2026) for approximate stream counts
 - Stack: Vite + React, hand-rolled SVG chart, deployed to GitHub Pages
+- Artist wordmarks in `public/artists/` are from Wikimedia Commons (mostly
+  PD-textlogo / CC), rendered as white silhouettes via CSS filter
 
 ## Develop
 
