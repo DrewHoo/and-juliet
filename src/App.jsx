@@ -24,6 +24,19 @@ export default function App() {
     if (id) url.searchParams.set('song', id)
     else url.searchParams.delete('song')
     window.history.replaceState(null, '', url)
+    // The replaceState above already generates a pageview via the shared
+    // analytics embed; this names the song so "which ones do people click"
+    // is one query rather than a pathname parse. Optional-chained because the
+    // embed is third-party and may be blocked.
+    if (id) {
+      const song = SONGS.find((s) => s.id === id)
+      window.dhAnalytics?.track('Song selected', {
+        id,
+        title: song?.title,
+        artist: song?.artist,
+        year: Number(song?.date.slice(0, 4)),
+      })
+    }
   }
 
   return (
