@@ -1,4 +1,4 @@
-import { fmtDate, fmtStreams } from './Timeline.jsx'
+import { fmtDate, fmtStreams } from './format.js'
 
 export default function SongTable({ songs, selected, onSelect }) {
   const rows = [...songs].sort((a, b) => a.date.localeCompare(b.date))

@@ -1,24 +1,13 @@
+// Not currently mounted: the page is the release timeline alone. Kept intact
+// (and still building) so the artist-lane view can come back without a rewrite.
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { WORDMARKS } from './data/wordmarks.js'
+import { markBox } from './data/wordmarks.js'
+import { fmtDate, fmtStreams } from './format.js'
 
 const PREMIERE = Date.UTC(2019, 10, 20) // West End opening night, 20 Nov 2019
 
 function ts(iso) {
   return Date.parse(`${iso}T00:00:00Z`)
-}
-
-export function fmtDate(iso) {
-  return new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    timeZone: 'UTC',
-  })
-}
-
-export function fmtStreams(m) {
-  if (m == null) return '—'
-  if (m >= 1000) return `${(m / 1000).toFixed(1)}B`
-  return `${Math.round(m)}M`
 }
 
 // One swimlane per artist, most influential first (song count, then total
@@ -196,7 +185,12 @@ export default function Timeline({ songs, selected, onSelect }) {
           if (!collides) break
         }
       }
-      const spread = Math.max(...rows.map((d) => Math.abs(d.dy) + d.r), 12)
+      // The lane also has to clear its wordmark: single-song lanes centre the
+      // mark on the baseline, multi-song lanes stack it above a summary line.
+      const markH = markBox(lane.artist)?.h ?? 24
+      const labelSpread =
+        lane.songs.length > 1 ? Math.max(markH + 3, 20) : markH / 2 + 3
+      const spread = Math.max(...rows.map((d) => Math.abs(d.dy) + d.r), 12, labelSpread)
       const laneH = spread * 2 + 12
       const cy = yCursor + laneH / 2
       for (const d of rows) placed.push({ ...d, cy: cy + d.dy, lane: lane.artist })
@@ -321,7 +315,7 @@ export default function Timeline({ songs, selected, onSelect }) {
               &amp; Juliet opens · Nov 2019
             </text>
             {layout.laneBands.map(({ lane, top, cy }, i) => {
-              const mark = WORDMARKS[lane.artist]
+              const mark = markBox(lane.artist)
               const multi = lane.songs.length > 1
               const markW = mark?.w ?? 118
               const markH = mark?.h ?? 24

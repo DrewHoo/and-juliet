@@ -13,7 +13,11 @@
 
   --pink: #f23a95;        /* series slot 1 — validated on --surface */
   --violet: #8a6cf0;      /* series slot 2 / annotation — validated */
-  --gold: #ffd60a;        /* chrome accent only, never data identity */
+  --gold: #ffd60a;        /* chrome accent, plus the "#1" state in the marquee,
+                             where it is always doubled by a ★ and a text peak
+                             so colour is never carrying the meaning alone */
+
+  --display: Anton, 'Arial Narrow', 'Helvetica Neue Condensed', system-ui, sans-serif;
 }
 
 * { box-sizing: border-box; }
@@ -21,6 +25,9 @@
 html, body {
   margin: 0;
   padding: 0;
+  /* the marquee's glow bleeds well past the text column; clip (not hidden, so
+     nothing becomes a scroll container) keeps that off the horizontal scrollbar */
+  overflow-x: clip;
   background: var(--bg);
   color: var(--text-primary);
   font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -28,10 +35,12 @@ html, body {
   line-height: 1.5;
 }
 
+/* The page is one card. Narrower than the old multi-section layout so the
+   marquee reads as a playbill rather than a full-bleed dashboard. */
 main {
-  max-width: 1080px;
+  max-width: 820px;
   margin: 0 auto;
-  padding: 48px 24px 80px;
+  padding: 56px 24px 80px;
 }
 
 a { color: var(--violet); }
@@ -202,31 +211,6 @@ section > .sub {
   font-weight: 600;
 }
 
-.share-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 14px;
-}
-
-.share-btn {
-  background: var(--surface-2);
-  color: var(--text-primary);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 7px 14px;
-  font-size: 13.5px;
-  font-family: inherit;
-  cursor: pointer;
-}
-
-.share-btn:hover { border-color: var(--violet); }
-
-.share-note {
-  font-size: 12.5px;
-  color: var(--text-muted);
-}
-
 /* ---------- table ---------- */
 
 .table-scroll { overflow-x: auto; }
@@ -261,12 +245,337 @@ tr.selected td { background: rgba(242, 58, 149, 0.08); }
 
 td .artist { color: var(--text-secondary); }
 
+/* ---------- neon marquee: the release timeline ---------- */
+
+/* & Juliet's own marketing leans hard on glow, so this card does too: a lit
+   tube along the top edge, a pink bloom off the box, and every dot burning. */
+/* No card: a bordered, rounded, shadowed panel reads as a container, and the
+   page is only ever this one thing — there is nothing to contain it against.
+   The "surface" is light instead, thrown from behind the sign by ::after. */
+.marquee {
+  position: relative;
+  /* own stacking context so the negative-z glow layers stay inside it */
+  isolation: isolate;
+  padding: 26px 2px 20px;
+}
+
+/* Every layer has to finish fading *inside* this box, or the box edge shows up
+   as a hard band — the same container line we just took off. So each radius is
+   sized against its own centre: centre ± (radius × transparent-stop) stays
+   within 0–100%. Horizontal radii are percentages because px ones clip on a
+   phone; the headline bloom's vertical radius is px so it stays anchored to the
+   title however long the list gets. */
+.marquee::after {
+  content: '';
+  position: absolute;
+  z-index: -2;
+  inset: -320px -26% -420px -26%;
+  pointer-events: none;
+  background:
+    /* headline bloom */
+    radial-gradient(64% 340px at 50% 400px, rgba(242, 58, 149, 0.34), transparent 70%),
+    /* footlight — without it the list fades into flat black by about 2015 */
+    radial-gradient(72% 20% at 50% 78%, rgba(242, 58, 149, 0.19), transparent 74%),
+    /* body wash, so the middle isn't dead air between the two */
+    radial-gradient(62% 42% at 50% 55%, rgba(138, 108, 240, 0.12), transparent 76%),
+    radial-gradient(88% 48% at 50% 52%, rgba(255, 255, 255, 0.042), transparent 78%);
+}
+
+.m-head {
+  margin: 0;
+  font-weight: 400;
+}
+
+.m-eyebrow {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  color: var(--gold);
+  text-shadow: 0 0 10px rgba(255, 214, 10, 0.75), 0 0 26px rgba(255, 214, 10, 0.4);
+}
+
+.m-title {
+  display: block;
+  position: relative;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: clamp(30px, 6.4vw, 46px);
+  line-height: 1.06;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  margin: 4px 0 6px;
+  color: #fff;
+  /* Only a hairline lit edge here. Anton's counters are a few px wide, so any
+     tight high-alpha shadow bleeds in from the surrounding strokes and fills
+     them — that's what turned this into a blob. All real bloom goes on ::before. */
+  text-shadow: 0 0 2px rgba(255, 214, 236, 0.55);
+}
+
+/* The glow, as its own layer behind the letters. Animating this instead of
+   .m-title means the tube core stays lit while the gas around it buzzes. */
+.m-title::before {
+  content: attr(data-text);
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: -1;
+  color: transparent;
+  pointer-events: none;
+  text-shadow:
+    0 0 14px rgba(255, 138, 199, 0.7),
+    0 0 34px rgba(242, 58, 149, 0.75),
+    0 0 72px rgba(242, 58, 149, 0.5),
+    0 0 130px rgba(242, 58, 149, 0.3);
+  animation: m-buzz 9s linear infinite;
+}
+
+/* A real sign holds steady for a long stretch, stutters for a beat, then
+   settles and slowly breathes. Steps in the stutter, ramps either side. */
+@keyframes m-buzz {
+  0%, 46% { opacity: 1; }
+  47% { opacity: 0.45; }
+  48% { opacity: 1; }
+  49.5% { opacity: 0.28; }
+  50% { opacity: 0.9; }
+  51% { opacity: 0.4; }
+  52%, 68% { opacity: 1; }
+  80% { opacity: 0.72; }
+  92%, 100% { opacity: 1; }
+}
+
+.m-sub {
+  margin: 0;
+  max-width: 46em;
+  font-size: 13px;
+  color: #c6aed8;
+}
+
+.m-sub em {
+  font-style: normal;
+  color: #ffc4e3;
+  text-shadow: 0 0 12px rgba(242, 58, 149, 0.55);
+}
+
+.m-legend {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  font-size: 11.5px;
+  color: #d9cbea;
+  padding: 14px 0 12px;
+  margin-bottom: 6px;
+}
+
+/* The tube light, relocated. It used to run along the top edge of the card,
+   which without the card would just look like the one surviving side of a box.
+   As the header/list divider it reads as signage instead. Absolute so it stays
+   out of the legend's flex flow; it fades out right so it has no hard stop. */
+.m-legend::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    var(--pink) 0%,
+    #fff 32%,
+    var(--pink) 62%,
+    rgba(242, 58, 149, 0) 100%
+  );
+  box-shadow:
+    0 0 9px rgba(255, 255, 255, 0.55),
+    0 0 20px rgba(242, 58, 149, 0.95),
+    0 0 52px rgba(242, 58, 149, 0.6);
+}
+
+.m-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.m-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.m-dot.hit {
+  background: #ff8ac5;
+  box-shadow: 0 0 5px var(--pink), 0 0 13px var(--pink), 0 0 26px rgba(242, 58, 149, 0.8);
+}
+
+.m-dot.one {
+  background: #fff0a8;
+  box-shadow: 0 0 5px var(--gold), 0 0 14px var(--gold), 0 0 28px rgba(255, 214, 10, 0.85);
+}
+
+.m-dot.show {
+  background: #b9a5ff;
+  box-shadow: 0 0 5px var(--violet), 0 0 14px var(--violet), 0 0 28px rgba(138, 108, 240, 0.85);
+}
+
+.m-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.m-rows .m-jump { margin-top: 16px; }
+
+.m-row {
+  display: grid;
+  grid-template-columns: 42px 16px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 6px;
+  margin: 0 -6px;
+  background: none;
+  border: 0;
+  border-radius: 7px;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+.m-row:hover,
+.m-row:focus-visible {
+  background: rgba(242, 58, 149, 0.1);
+  outline: none;
+}
+
+.m-row.is-selected { background: rgba(242, 58, 149, 0.16); }
+
+.m-row:hover .m-name,
+.m-row:focus-visible .m-name,
+.m-row.is-selected .m-name {
+  text-shadow:
+    0 0 4px rgba(255, 255, 255, 0.7),
+    0 0 16px rgba(242, 58, 149, 0.95),
+    0 0 40px rgba(242, 58, 149, 0.6);
+}
+
+.m-year {
+  font-size: 11px;
+  font-weight: 700;
+  color: #a78bc6;
+  font-variant-numeric: tabular-nums;
+}
+
+/* the spine the dots hang on — segments butt together into one lit line */
+.m-spine {
+  position: relative;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+}
+
+.m-spine::before {
+  content: '';
+  position: absolute;
+  top: -6px;
+  bottom: -6px;
+  width: 1px;
+  background: rgba(242, 58, 149, 0.55);
+  box-shadow: 0 0 6px rgba(242, 58, 149, 0.6);
+}
+
+.m-spine .m-dot {
+  position: relative;
+  width: 7px;
+  height: 7px;
+}
+
+.m-song {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.m-name {
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 15px;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
+  color: #fff;
+  white-space: nowrap;
+  /* `clip` + a margin, not `hidden`: plain overflow clipping cuts the glow off
+     at the text box and leaves a hard-edged rectangle around every title. */
+  overflow: clip;
+  overflow-clip-margin: 22px;
+  text-overflow: ellipsis;
+  text-shadow: 0 0 12px rgba(242, 58, 149, 0.55), 0 0 30px rgba(242, 58, 149, 0.3);
+}
+
+.m-mark {
+  flex: none;
+  object-fit: contain;
+  object-position: left center;
+  filter:
+    brightness(0) invert(0.96)
+    drop-shadow(0 0 5px rgba(242, 58, 149, 0.75))
+    drop-shadow(0 0 14px rgba(242, 58, 149, 0.45));
+  opacity: 0.95;
+}
+
+.m-artist {
+  flex: none;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #a894bd;
+}
+
+.m-badge {
+  font-size: 11px;
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  color: #a08fb3;
+}
+
+.m-badge.is-one {
+  color: #ffe266;
+  text-shadow: 0 0 10px rgba(255, 214, 10, 0.9), 0 0 26px rgba(255, 214, 10, 0.5);
+}
+
+.m-badge.is-none {
+  color: #a68cff;
+  text-shadow: 0 0 12px rgba(138, 108, 240, 0.7);
+}
+
+.m-foot {
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  margin: 14px 0 0;
+  padding-top: 10px;
+  font-size: 10.5px;
+  color: #8d7ba3;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .m-title { animation: none; }
+}
+
 /* ---------- footer ---------- */
 
 .sources {
   color: var(--text-muted);
-  font-size: 13px;
-  max-width: 720px;
+  font-size: 12.5px;
+  margin-top: 26px;
 }
 
 /* ---------- responsive ---------- */
@@ -276,6 +585,20 @@ td .artist { color: var(--text-secondary); }
 @media (max-width: 616px) {
   .mobile-only { display: inline; }
   .desktop-only { display: none; }
+}
+
+/* Phone marquee: titles wrap instead of truncating, artist drops below. */
+@media (max-width: 640px) {
+  .marquee { padding: 20px 0 16px; }
+  .m-row {
+    grid-template-columns: 34px 14px minmax(0, 1fr) auto;
+    gap: 7px;
+    padding: 6px 5px;
+  }
+  .m-song { flex-direction: column; align-items: flex-start; gap: 3px; }
+  .m-name { font-size: 14px; white-space: normal; }
+  .m-badge { font-size: 10.5px; }
+  .m-legend { font-size: 11px; gap: 5px 14px; }
 }
 
 @media (max-width: 720px) {

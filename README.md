@@ -1,17 +1,25 @@
-# & Juliet: The Originals
+# & Juliet: The Release Timeline
 
-A timeline of the original recordings behind every number in the jukebox
-musical *& Juliet* — one swimlane per artist, bubbles placed at release date
-and sized by Spotify streams today. Live at
+Every song in the jukebox musical *& Juliet*, in the order it was originally
+released — 1997 to 2016 — rendered as a neon marquee. Live at
 [drewhoover.com/and-juliet](https://drewhoover.com/and-juliet/).
 
-- 29 covered pop hits (1997–2016) + 1 song written for the show, all
+- 29 covered pop hits + 1 written for the show ("One More Try"), all
   co-written by Max Martin
-- Data: Broadway cast recording track list; Billboard/Wikipedia for release
-  dates and chart peaks; kworb.net (Aug 2026) for approximate stream counts
-- Stack: Vite + React, hand-rolled SVG chart, deployed to GitHub Pages
+- Popularity is shown as **chart peak, not streams**: the better of a song's
+  US Hot 100 and UK Singles position. Best-of-both matters because
+  Billboard's pre-2003 commercial-single rule kept airplay-only releases off
+  the Hot 100 entirely — it's the only reason "As Long as You Love Me" and
+  "I'm Not a Girl, Not Yet a Woman" have no US number
+- Data: Broadway cast recording track list; Billboard, the Official Charts
+  Company and Wikipedia for release dates and chart peaks
+- Stack: Vite + React, hand-rolled CSS, prerendered to static HTML at build
+  time, deployed to GitHub Pages
 - Artist wordmarks in `public/artists/` are from Wikimedia Commons (mostly
   PD-textlogo / CC), rendered as white silhouettes via CSS filter
+
+`src/Timeline.jsx` (artist-swimlane bubble chart) and `src/SongTable.jsx` are
+kept and still compile, but are not mounted — the page is the marquee alone.
 
 ## Develop
 
@@ -19,6 +27,14 @@ and sized by Spotify streams today. Live at
 npm install
 npm run dev
 ```
+
+## Build
+
+`npm run build` runs Vite and then `scripts/prerender.mjs`, which renders the
+app to static HTML into `#root`, injects `ItemList` / `WebPage` /
+`BreadcrumbList` JSON-LD generated from `src/data/songs.js`, and writes
+`sitemap.xml`. Without that step the deployed page is an empty `<div>` and
+non-JS crawlers see nothing.
 
 ## Regenerate assets
 
