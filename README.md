@@ -42,3 +42,12 @@ non-JS crawlers see nothing.
 npm run gen:favicon
 npm run gen:og
 ```
+
+`gen:og` writes two images: `og.png` (1200×630, social unfurls) and `card.png`
+(1200×750). The second exists because the drewhoover.com project card crops its
+cover to 8:5 with `object-fit: cover` — feeding it the 630-tall OG shaves off
+the top and bottom. After regenerating, copy it across:
+
+```bash
+cp public/card.png ../DrewHoo.github.io/public/projects/and-juliet.png
+```
