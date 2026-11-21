@@ -24,13 +24,13 @@ kept and still compile, but are not mounted — the page is the marquee alone.
 ## Develop
 
 ```bash
-npm install
-npm run dev
+pnpm install
+pnpm run dev
 ```
 
 ## Build
 
-`npm run build` runs Vite and then `scripts/prerender.mjs`, which renders the
+`pnpm run build` runs Vite and then `scripts/prerender.mjs`, which renders the
 app to static HTML into `#root`, injects `ItemList` / `WebPage` /
 `BreadcrumbList` JSON-LD generated from `src/data/songs.js`, and writes
 `sitemap.xml`. Without that step the deployed page is an empty `<div>` and
@@ -39,8 +39,8 @@ non-JS crawlers see nothing.
 ## Regenerate assets
 
 ```bash
-npm run gen:favicon
-npm run gen:og
+pnpm run gen:favicon
+pnpm run gen:og
 ```
 
 `gen:og` writes two images: `og.png` (1200×630, social unfurls) and `card.png`
